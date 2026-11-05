@@ -28,3 +28,11 @@ def compare_with_blacklist(
         "difference": ips - blacklist,
         "symmetric_difference": ips ^ blacklist,
     }
+
+
+def count_by(records: Iterable[Record], key: str) -> defaultdict[str, int]:
+    """Compte les records selon la valeur de la clé donnée."""
+    counts: defaultdict[str, int] = defaultdict(int)
+    for record in records:
+        counts[record[key]] += 1
+    return counts

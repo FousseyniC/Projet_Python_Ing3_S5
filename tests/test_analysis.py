@@ -21,3 +21,15 @@ def test_compare_with_blacklist():
     assert result["intersection"] == {"203.0.113.9"}
     assert result["difference"] == {"1.1.1.1"}
     assert result["symmetric_difference"] == {"1.1.1.1", "8.8.8.8"}
+
+
+def test_count_by():
+    records = [
+        {"level": "INFO"}, {"level": "INFO"}, {"level": "INFO"},
+        {"level": "ERROR"}, {"level": "CRITICAL"},
+    ]
+    assert analysis.count_by(records, "level") == {
+        "INFO": 3,
+        "ERROR": 1,
+        "CRITICAL": 1,
+    }
