@@ -4,3 +4,4 @@ venv/
 # logs generer (10-15 GB)
 data/*
 !data/.gitkeep
+
