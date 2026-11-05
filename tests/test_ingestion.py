@@ -2,7 +2,10 @@
 
 from types import GeneratorType
 
-from moteur_traitement.ingestion import read_log_file, read_many_files
+from moteur_traitement.ingestion import parse_line, read_log_file, read_many_files
+
+
+# --- Lecture des fichiers (yield / yield from) ---
 
 # Vérifie que read_log_file renvoie un générateur (yield).
 def test_read_log_file_est_un_generateur(tmp_path):
@@ -34,4 +37,38 @@ def test_read_many_files_ignore_un_fichier_absent(tmp_path):
     absent = tmp_path / "absent.log"
     assert list(read_many_files([absent, a])) == ["a1\n"]
 
+# --- Parsing des lignes ---
+
+# Vérifie qu'une ligne propre donne le bon dictionnaire.
+def test_parse_line_lignes_propres(sample_lines, sample_records):
+    for i in range(len(sample_lines)):
+        assert parse_line(sample_lines[i]) == sample_records[i]
+
+
+# Vérifie que les lignes sales sont réparées.
+def test_parse_line_lignes_sales(dirty_lines):
+    for line, champs_attendus in dirty_lines:
+        record = parse_line(line)
+        assert record is not None, line
+        for cle, valeur in champs_attendus.items():
+            assert record[cle] == valeur, line
+
+
+# Vérifie que les lignes cassées donnent None.
+def test_parse_line_lignes_inutilisables(invalid_lines):
+    for line in invalid_lines:
+        assert parse_line(line) is None, repr(line)
+
+
+# Vérifie que les IP invalides sont gardées (le Module 2 les retire).
+def test_parse_line_garde_les_ip_invalides(bad_ip_lines):
+    for line in bad_ip_lines:
+        assert parse_line(line) is not None, line
+
+
+# Vérifie que connection est bien un tuple (IP, port, protocole).
+def test_connection_est_un_tuple(sample_lines):
+    record = parse_line(sample_lines[0])
+    assert record["connection"] == ("197.125.255.225", 22, "SSH")
+    assert isinstance(record["connection"], tuple)
     
