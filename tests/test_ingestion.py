@@ -2,7 +2,13 @@
 
 from types import GeneratorType
 
-from moteur_traitement.ingestion import parse_line, read_log_file, read_many_files
+from moteur_traitement.ingestion import (
+    load_blacklist,
+    parse_line,
+    read_log_file,
+    read_many_files,
+    read_records,
+)
 
 
 # --- Lecture des fichiers (yield / yield from) ---
@@ -71,4 +77,27 @@ def test_connection_est_un_tuple(sample_lines):
     record = parse_line(sample_lines[0])
     assert record["connection"] == ("197.125.255.225", 22, "SSH")
     assert isinstance(record["connection"], tuple)
-    
+
+
+
+
+# --- read_records et load_blacklist ---
+
+# Vérifie que read_records ne crée pas de liste en mémoire.
+def test_read_records_reste_paresseux(tmp_path):
+    fichier = tmp_path / "a.log"
+    fichier.write_text("2026-01-01 00:00:00 | INFO | 10.0.0.1 | - | ok\n\n",
+                       encoding="utf-8")
+    records = read_records(fichier)
+    assert not isinstance(records, list)
+    resultat = list(records)
+    assert resultat[0]["level"] == "INFO"
+    assert resultat[1] is None
+
+
+# Vérifie que la blacklist devient un frozenset, sans les lignes vides.
+def test_load_blacklist(tmp_path):
+    fichier = tmp_path / "blacklist.txt"
+    fichier.write_text("1.2.3.4\n\n5.6.7.8\n", encoding="utf-8")
+    blacklist = load_blacklist(fichier)
+    assert blacklist == frozenset({"1.2.3.4", "5.6.7.8"})
