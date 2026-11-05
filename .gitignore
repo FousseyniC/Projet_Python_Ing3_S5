@@ -1,7 +1,6 @@
-# venv
 venv/
-
-# logs generer (10-15 GB)
-data/*
-!data/.gitkeep
-
+.venv/
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+data/complet/
