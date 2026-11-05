@@ -1,6 +1,10 @@
 """Tests du Module 1 : lecture des fichiers et parsing des lignes."""
 
+import tracemalloc
+from pathlib import Path
 from types import GeneratorType
+
+import pytest
 
 from moteur_traitement.ingestion import (
     load_blacklist,
@@ -9,6 +13,8 @@ from moteur_traitement.ingestion import (
     read_many_files,
     read_records,
 )
+
+ECHANTILLON = Path(__file__).parent.parent / "data" / "echantillon"
 
 
 # --- Lecture des fichiers (yield / yield from) ---
@@ -101,3 +107,23 @@ def test_load_blacklist(tmp_path):
     fichier.write_text("1.2.3.4\n\n5.6.7.8\n", encoding="utf-8")
     blacklist = load_blacklist(fichier)
     assert blacklist == frozenset({"1.2.3.4", "5.6.7.8"})
+
+
+
+# --- Mémoire : le fichier n'est jamais chargé en entier ---
+
+# Vérifie que la mémoire reste basse en lisant tout l'échantillon.
+def test_memoire_reste_basse():
+    log = ECHANTILLON / "server.log"
+    if not log.exists():
+        pytest.skip("échantillon absent")
+
+    tracemalloc.start()
+    nb_records = sum(1 for _ in read_records(log))
+    _, pic = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    taille_fichier = log.stat().st_size
+    assert nb_records > 0
+    # Le pic de mémoire doit rester très inférieur à la taille du fichier.
+    assert pic < taille_fichier / 10
