@@ -16,3 +16,15 @@ def error_ips(records: Iterable[Record]) -> set[str]:
         if record["level"] in ("ERROR", "CRITICAL"):
             ips.add(record["ip"])
     return ips
+
+
+def compare_with_blacklist(
+    ips: set[str], blacklist: frozenset[str]
+) -> dict[str, set[str]]:
+    """Compare les IP actives à la liste noire avec les opérations d'ensembles."""
+    return {
+        "union": ips | blacklist,
+        "intersection": ips & blacklist,
+        "difference": ips - blacklist,
+        "symmetric_difference": ips ^ blacklist,
+    }
