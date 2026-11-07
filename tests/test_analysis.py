@@ -67,7 +67,7 @@ def test_detect_brute_force_small_batches():
     result = analysis.detect_brute_force(records, batch_size=2)
     assert result == [("6.6.6.6", "bob")]
 
-   
+
 def test_stats_update(sample_records):
     stats = analysis.Stats()
     for record in sample_records:
@@ -98,5 +98,3 @@ def test_stats_compare_with_blacklist(sample_records):
     blacklist = frozenset({"77.185.106.206", "8.8.8.8"})
     result = stats.compare_with_blacklist(blacklist)
     assert result["intersection"] == {"77.185.106.206"}
-
-    

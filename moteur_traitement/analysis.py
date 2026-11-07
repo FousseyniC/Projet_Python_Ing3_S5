@@ -168,4 +168,3 @@ class Stats:
             len(self.error_ips),
             len(self.alerts),
         )
-        
