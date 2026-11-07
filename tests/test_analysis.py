@@ -66,3 +66,37 @@ def test_detect_brute_force_small_batches():
     records = [login("failed")] * 6
     result = analysis.detect_brute_force(records, batch_size=2)
     assert result == [("6.6.6.6", "bob")]
+
+   
+def test_stats_update(sample_records):
+    stats = analysis.Stats()
+    for record in sample_records:
+        stats.update(record)
+    assert stats.total == 4
+    assert stats.error_ips == {"22.128.79.209", "77.185.106.206"}
+    assert stats.by_level == {
+        "INFO": 1,
+        "WARNING": 1,
+        "ERROR": 1,
+        "CRITICAL": 1,
+    }
+    assert stats.alerts == []
+
+
+def test_stats_same_as_detect_brute_force():
+    records = [login("failed")] * 6 + [login("success", "7.7.7.7")]
+    stats = analysis.Stats(threshold=5)
+    for record in records:
+        stats.update(record)
+    assert stats.alerts == analysis.detect_brute_force(records, threshold=5)
+
+
+def test_stats_compare_with_blacklist(sample_records):
+    stats = analysis.Stats()
+    for record in sample_records:
+        stats.update(record)
+    blacklist = frozenset({"77.185.106.206", "8.8.8.8"})
+    result = stats.compare_with_blacklist(blacklist)
+    assert result["intersection"] == {"77.185.106.206"}
+
+    

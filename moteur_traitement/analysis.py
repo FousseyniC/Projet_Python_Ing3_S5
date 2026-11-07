@@ -122,3 +122,50 @@ def detect_brute_force(
 
     logger.debug("Force brute : %d alertes", len(detector.alerts))
     return detector.alerts
+
+
+class Stats:
+    """Regroupe les analyses du Module 3, alimentées record par record.
+
+    main.py appelle update(record) pour chaque record, dans sa boucle
+    unique : le fichier n'est lu qu'une seule fois.
+    """
+
+    def __init__(self, threshold: int = 5) -> None:
+        self.total = 0
+        self.ips: set[str] = set()
+        self.error_ips: set[str] = set()
+        self.by_level: defaultdict[str, int] = defaultdict(int)
+        self.by_user: defaultdict[str | None, int] = defaultdict(int)
+        self.brute_force = BruteForceDetector(threshold)
+
+    def update(self, record: Record) -> None:
+        """Ajoute un record à toutes les analyses."""
+        self.total += 1
+        self.ips.add(record["ip"])
+        self.by_level[record["level"]] += 1
+        self.by_user[record["user"]] += 1
+        if record["level"] in ERROR_LEVELS:
+            self.error_ips.add(record["ip"])
+        self.brute_force.feed(record)
+
+    @property
+    def alerts(self) -> list[LoginKey]:
+        """Alertes de force brute trouvées jusqu'ici."""
+        return self.brute_force.alerts
+
+    def compare_with_blacklist(
+        self, blacklist: frozenset[str]
+    ) -> dict[str, set[str]]:
+        """Compare toutes les IP vues à la liste noire."""
+        return compare_with_blacklist(self.ips, blacklist)
+
+    def log_summary(self) -> None:
+        """Écrit un seul message de débogage avec le bilan."""
+        logger.debug(
+            "Module 3 : %d records, %d IP en erreur, %d alertes",
+            self.total,
+            len(self.error_ips),
+            len(self.alerts),
+        )
+        
