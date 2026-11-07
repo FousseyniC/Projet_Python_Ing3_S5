@@ -289,6 +289,8 @@ match record:
 
 ## 7. Point ouvert : un seul passage sur les données
 
+**Décision de l'équipe : option 2** (une seule boucle dans main.py).
+
 Un générateur **ne se lit qu'une seule fois**. Si `error_ips`, `count_by` et `detect_brute_force`
 consomment chacune le flux complet, il faut relire les 15 Go plusieurs fois (lent), ou stocker les records
 en mémoire (interdit).
