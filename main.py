@@ -5,7 +5,7 @@ import logging
 import os
 import time
 
-from moteur_traitement.ingestion import parse_line, read_many_files
+from moteur_traitement.ingestion import load_blacklist, parse_line, read_many_files
 
 
 def parse_args() -> argparse.Namespace:
@@ -56,7 +56,6 @@ def show_progress(done: int, total: int, nb_lines: int, start: float) -> None:
 def read_and_count(path: str) -> dict[str, int]:
     """Lit le fichier ligne par ligne et compte les lignes gardées."""
     total = os.path.getsize(path)
-
     stats = {"lues": 0, "gardees": 0, "rejetees": 0}
     done = 0
     start = time.time()
@@ -94,6 +93,12 @@ def main() -> None:
     if not os.path.exists(args.input):
         logging.error("Fichier de logs introuvable : %s", args.input)
         return
+    if not os.path.exists(args.blacklist):
+        logging.error("Blacklist introuvable : %s", args.blacklist)
+        return
+
+    blacklist = load_blacklist(args.blacklist)
+    logging.debug("Blacklist chargée : %d IP", len(blacklist))
 
     print(f"Analyse de {args.input}...")
     stats = read_and_count(args.input)
