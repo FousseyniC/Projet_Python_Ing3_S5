@@ -34,7 +34,7 @@ Une application **en ligne de commande** (CLI, dans le terminal) qui :
 6. applique des règles de sécurité configurables et produit un rapport d'audit.
 
 ```
-python main.py --input data/complet/server.log --blacklist data/complet/blacklist.txt --threshold 5
+python main.py --input data/complet/server.log --blacklist data/complet/blacklist.txt --max-echecs 5
 ```
 
 ---
@@ -283,10 +283,13 @@ match record:
 - Lit les arguments CLI (`argparse`) : fichier de logs, blacklist, seuil force brute.
 - Branche les modules dans l'ordre du flux de données.
 - Affiche le résumé (y compris les **statistiques de nettoyage**) et écrit le rapport d'audit.
+- Affiche à chaque lancement les messages de débogage (`logging`, niveau DEBUG) et une barre d'avancement.
 
 ---
 
 ## 7. Point ouvert : un seul passage sur les données
+
+**Décision de l'équipe : option 2** (une seule boucle dans main.py).
 
 Un générateur **ne se lit qu'une seule fois**. Si `error_ips`, `count_by` et `detect_brute_force`
 consomment chacune le flux complet, il faut relire les 15 Go plusieurs fois (lent), ou stocker les records
@@ -381,8 +384,8 @@ Les graphiques peuvent être produits par un script (`matplotlib`, enregistrés 
 
 | Module | Responsable | Barème associé |
 |---|---|---|
-| 1. Ingestion | _à compléter_ | Gestion mémoire & générateurs (4 pts) |
-| 2. Pipeline & nettoyage | _à compléter_ | Programmation fonctionnelle (4 pts) |
-| 3. Analyse | _à compléter_ | Structures de données complexes (4 pts) |
-| 4. Règles & audit | _à compléter_ | Moteur de règles & introspection (3 pts) |
+| 1. Ingestion | Fousseyni | Gestion mémoire & générateurs (4 pts) |
+| 2. Pipeline & nettoyage | Adam | Programmation fonctionnelle (4 pts) |
+| 3. Analyse | Selyan | Structures de données complexes (4 pts) |
+| 4. Règles & audit | Amine | Moteur de règles & introspection (3 pts) |
 | Commun | toute l'équipe | Environnement & livrables (2 pts), qualité du code (3 pts), rapport PDF, soutenance |
