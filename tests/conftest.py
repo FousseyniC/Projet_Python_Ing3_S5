@@ -13,7 +13,8 @@ def sample_lines() -> list[str]:
     """Lignes propres."""
     return [
         '2026-01-01 00:26:31 | WARNING | 197.125.255.225 | farid49 | '
-        '{"action": "login", "status": "failed", "port": 22, "protocol": "SSH"}',
+        '{"action": "login", "status": "failed", '
+        '"port": 22, "protocol": "SSH"}',
         '2026-01-01 00:26:31 | ERROR | 22.128.79.209 | david49 | '
         '{"method": "GET", "url": "/api/products", "status": 503, '
         '"duration_ms": 14479, "port": 443, "protocol": "HTTPS"}',
@@ -41,8 +42,14 @@ def sample_records() -> list[dict]:
             "level": "ERROR",
             "ip": "22.128.79.209",
             "user": "david49",
-            "payload": {"method": "GET", "url": "/api/products", "status": 503,
-                        "duration_ms": 14479, "port": 443, "protocol": "HTTPS"},
+            "payload": {
+                "method": "GET",
+                "url": "/api/products",
+                "status": 503,
+                "duration_ms": 14479,
+                "port": 443,
+                "protocol": "HTTPS",
+            },
             "connection": ("22.128.79.209", 443, "HTTPS"),
         },
         {
@@ -67,7 +74,8 @@ def sample_records() -> list[dict]:
 @pytest.fixture
 def dirty_lines() -> list[tuple[str, dict]]:
     """Lignes sales mais réparables : (ligne, champs attendus)."""
-    login = '{"action": "login", "status": "failed", "port": 22, "protocol": "SSH"}'
+    login = ('{"action": "login", "status": "failed", '
+             '"port": 22, "protocol": "SSH"}')
     return [
         # Séparateurs
         (f"2026-01-01 00:26:31|INFO  |  10.0.0.5\t|\talice1 | {login}",
@@ -101,11 +109,13 @@ def dirty_lines() -> list[tuple[str, dict]]:
          {"user": None}),
         # JSON avec des quotes simples
         ("2026-01-01 00:26:31 | WARNING | 10.0.0.5 | alice1 | "
-         "{'action': 'login', 'status': 'failed', 'port': 22, 'protocol': 'SSH'}",
+         "{'action': 'login', 'status': 'failed', "
+         "'port': 22, 'protocol': 'SSH'}",
          {"connection": ("10.0.0.5", 22, "SSH")}),
         # Clés JSON en majuscule
         ("2026-01-01 00:26:31 | WARNING | 10.0.0.5 | alice1 | "
-         '{"Action": "login", "Status": "failed", "Port": 22, "Protocol": "ssh"}',
+         '{"Action": "login", "Status": "failed", '
+         '"Port": 22, "Protocol": "ssh"}',
          {"connection": ("10.0.0.5", 22, "SSH")}),
         # JSON cassé : gardé en texte
         ('2026-01-01 00:26:31 | WARNING | 10.0.0.5 | alice1 | {"action": "lo',
@@ -125,14 +135,19 @@ def invalid_lines() -> list[str]:
         "",
         "   ",
         "\t",
-        "2026-01-01 00:26:31 | INFO | 85.87.3",                       # coupée
-        "2026-01-01 00:26:31 | DEBUG | 10.0.0.5 | alice1 | test",     # niveau inconnu
-        "2026-13-45 99:99:99 | INFO | 10.0.0.5 | alice1 | test",      # date fausse
-        "yesterday | INFO | 10.0.0.5 | alice1 | test",                # date fausse
-        "2026-01-01 00:26:31 | INFO | 10.0.0.5 | alice1",             # 4 champs
-        "#### log rotated ####",                                      # parasite
-        "\x00\x00\x00\x00",                                           # parasite
-        "<<<EOF>>>",                                                  # parasite
+        # Ligne coupée
+        "2026-01-01 00:26:31 | INFO | 85.87.3",
+        # Niveau inconnu
+        "2026-01-01 00:26:31 | DEBUG | 10.0.0.5 | alice1 | test",
+        # Dates fausses
+        "2026-13-45 99:99:99 | INFO | 10.0.0.5 | alice1 | test",
+        "yesterday | INFO | 10.0.0.5 | alice1 | test",
+        # 4 champs au lieu de 5
+        "2026-01-01 00:26:31 | INFO | 10.0.0.5 | alice1",
+        # Lignes parasites
+        "#### log rotated ####",
+        "\x00\x00\x00\x00",
+        "<<<EOF>>>",
     ]
 
 

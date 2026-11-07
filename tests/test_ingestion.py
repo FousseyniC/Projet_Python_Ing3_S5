@@ -27,6 +27,7 @@ def test_read_log_file_est_un_generateur(tmp_path):
     assert isinstance(lignes, GeneratorType)
     assert list(lignes) == ["ligne 1\n", "ligne 2\n"]
 
+
 # Vérifie que plusieurs fichiers sont lus à la suite (yield from).
 def test_read_many_files_enchaine_les_fichiers(tmp_path):
     a = tmp_path / "a.log"
@@ -48,6 +49,7 @@ def test_read_many_files_ignore_un_fichier_absent(tmp_path):
     a.write_text("a1\n", encoding="utf-8")
     absent = tmp_path / "absent.log"
     assert list(read_many_files([absent, a])) == ["a1\n"]
+
 
 # --- Parsing des lignes ---
 
@@ -85,8 +87,6 @@ def test_connection_est_un_tuple(sample_lines):
     assert isinstance(record["connection"], tuple)
 
 
-
-
 # --- read_records et load_blacklist ---
 
 # Vérifie que read_records ne crée pas de liste en mémoire.
@@ -107,7 +107,6 @@ def test_load_blacklist(tmp_path):
     fichier.write_text("1.2.3.4\n\n5.6.7.8\n", encoding="utf-8")
     blacklist = load_blacklist(fichier)
     assert blacklist == frozenset({"1.2.3.4", "5.6.7.8"})
-
 
 
 # --- Mémoire : le fichier n'est jamais chargé en entier ---

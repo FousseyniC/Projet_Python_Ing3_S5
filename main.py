@@ -5,7 +5,11 @@ import logging
 import os
 import time
 
-from moteur_traitement.ingestion import load_blacklist, parse_line, read_many_files
+from moteur_traitement.ingestion import (
+    load_blacklist,
+    parse_line,
+    read_many_files,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -107,3 +111,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    
