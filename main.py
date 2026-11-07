@@ -1,6 +1,7 @@
 """Point d'entrée : lance l'analyse des logs depuis le terminal."""
 
 import argparse
+import logging
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,9 +26,20 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def setup_logging() -> None:
+    """Affiche tous les messages de débogage, à chaque lancement."""
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="[%(levelname)s] %(message)s",
+    )
+
+
 def main() -> None:
     """Lance le programme."""
+    setup_logging()
     args = parse_args()
+    logging.debug("Options reçues : %s", vars(args))
+
     print(f"Fichier de logs : {args.input}")
     print(f"Blacklist : {args.blacklist}")
     print(f"Échecs max avant alerte : {args.max_echecs}")
