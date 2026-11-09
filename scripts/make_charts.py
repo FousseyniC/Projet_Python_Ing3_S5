@@ -81,3 +81,13 @@ def plot_attacks(
         "attaques_force_brute.png",
         output_dir,
     )
+def main() -> None:
+    """Démo avec de fausses données (remplacée par les vrais compteurs)."""
+    logging.basicConfig(level=logging.DEBUG)
+    plot_levels({"INFO": 700, "WARNING": 150, "ERROR": 80, "CRITICAL": 20})
+    plot_top_error_ips({"203.0.113.9": 120, "45.33.32.156": 90})
+    plot_attacks({"185.220.101.4": 14, "198.51.100.23": 9})
+
+
+if __name__ == "__main__":
+    main()
