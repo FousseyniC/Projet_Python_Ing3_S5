@@ -48,3 +48,16 @@ def normalize(record: Record) -> Record:
 def filter_levels(records: Iterable[Record]) -> Iterator[Record]:
     """Garde seulement les niveaux INFO, WARNING, ERROR, CRITICAL."""
     return filter(lambda r: r.get("level") in VALID_LEVELS, records)
+def route(record: Record) -> tuple[str, str | None]:
+    """Classe un record selon la forme de son contenu (match-case)."""
+    match (record.get("payload"), record.get("connection")):
+        case (str() as text, _):
+            return ("text", text)
+        case (dict(), (ip, port, protocol)):
+            return ("connection", f"{ip}:{port}/{protocol}")
+        case ({"action": action}, None):
+            return ("action", action)
+        case ({"method": method}, None):
+            return ("web", method)
+        case _:
+            return ("unknown", None)
