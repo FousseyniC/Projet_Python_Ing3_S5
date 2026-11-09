@@ -70,3 +70,14 @@ def plot_top_error_ips(
         "top_ip_erreur.png",
         output_dir,
     )
+def plot_attacks(
+    alerts: dict[str, int],
+    output_dir: Path = REPORT_DIR,
+) -> Path:
+    """Attaques de force brute détectées, par IP source."""
+    return _plot_top(
+        alerts,
+        "Attaques par force brute détectées",
+        "attaques_force_brute.png",
+        output_dir,
+    )
