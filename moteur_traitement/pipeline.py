@@ -61,3 +61,8 @@ def route(record: Record) -> tuple[str, str | None]:
             return ("web", method)
         case _:
             return ("unknown", None)
+
+def transform(records: Iterable[Record | None]) -> Iterator[Record]:
+    """Pipeline : filter(None), map(normalize), filter des niveaux."""
+    logger.debug("Construction du pipeline de transformation")
+    return filter_levels(map(normalize, remove_invalid(records)))

@@ -5,6 +5,7 @@ from moteur_traitement.pipeline import (
     normalize,
     remove_invalid,
     route,
+    transform,
 )
 
 
@@ -76,3 +77,19 @@ def test_route_web_sans_connexion():
 
 def test_route_inconnu():
     assert route({}) == ("unknown", None)
+
+def test_transform_enchaine_les_etapes():
+    raw = [
+        {"level": " warning ", "ip": "1.1.1.1", "user": "u1"},
+        None,
+        {"level": "DEBUGG", "ip": "2.2.2.2", "user": "u2"},
+    ]
+    out = list(transform(raw))
+    assert len(out) == 1
+    assert out[0]["level"] == "WARNING"
+
+
+def test_transform_reste_paresseux():
+    flux = (r for r in [{"level": "INFO", "ip": "1.1.1.1", "user": None}])
+    result = transform(flux)
+    assert iter(result) is result
