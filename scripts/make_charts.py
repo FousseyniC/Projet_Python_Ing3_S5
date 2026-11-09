@@ -31,3 +31,42 @@ def plot_levels(
     plt.close(fig)
     logger.debug("Graphique enregistré : %s", path)
     return path
+
+def _plot_top(
+    counts: dict[str, int],
+    title: str,
+    filename: str,
+    output_dir: Path,
+    top: int = 10,
+) -> Path:
+    """Barres horizontales des `top` plus grandes valeurs."""
+    output_dir.mkdir(exist_ok=True)
+    best = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)[:top]
+    labels = [key for key, _ in best]
+    values = [value for _, value in best]
+
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.barh(labels, values, color="#d9534f")
+    ax.invert_yaxis()  # le plus grand en haut
+    ax.set_title(title)
+    ax.set_xlabel("Nombre")
+    fig.tight_layout()
+
+    path = output_dir / filename
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    logger.debug("Graphique enregistré : %s", path)
+    return path
+
+
+def plot_top_error_ips(
+    counts: dict[str, int],
+    output_dir: Path = REPORT_DIR,
+) -> Path:
+    """Top 10 des IP ayant le plus de logs ERROR ou CRITICAL."""
+    return _plot_top(
+        counts,
+        "Top 10 des IP en erreur",
+        "top_ip_erreur.png",
+        output_dir,
+    )
