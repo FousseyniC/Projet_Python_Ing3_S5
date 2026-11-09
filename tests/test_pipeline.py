@@ -1,6 +1,10 @@
 """Tests du Module 2 (pipeline)."""
 
-from moteur_traitement.pipeline import normalize, remove_invalid
+from moteur_traitement.pipeline import (
+    filter_levels,
+    normalize,
+    remove_invalid,
+)
 
 
 def test_remove_invalid_supprime_les_none():
@@ -33,3 +37,7 @@ def test_normalize_ne_modifie_pas_loriginal():
 
 def test_normalize_entree_inattendue():
     assert normalize(None)["level"] is None
+
+def test_filter_levels_retire_les_niveaux_invalides():
+    sample = [{"level": "INFO"}, {"level": "DEBUGG"}, {"level": None}]
+    assert list(filter_levels(sample)) == [{"level": "INFO"}]

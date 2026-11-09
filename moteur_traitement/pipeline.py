@@ -3,7 +3,11 @@
 import logging
 from collections.abc import Iterable, Iterator
 from typing import Any
-from moteur_traitement.constants import LEVEL_ALIASES, NULL_USERS
+from moteur_traitement.constants import (
+    LEVEL_ALIASES,
+    NULL_USERS,
+    VALID_LEVELS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,3 +44,7 @@ def normalize(record: Record) -> Record:
         # Entrée inattendue : le niveau None la fera rejeter plus loin.
         return {"level": None}
     return cleaned
+
+def filter_levels(records: Iterable[Record]) -> Iterator[Record]:
+    """Garde seulement les niveaux INFO, WARNING, ERROR, CRITICAL."""
+    return filter(lambda r: r.get("level") in VALID_LEVELS, records)
