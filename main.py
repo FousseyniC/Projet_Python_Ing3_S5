@@ -11,6 +11,9 @@ from moteur_traitement.ingestion import (
     read_many_files,
 )
 
+from moteur_traitement.pipeline import is_valid_ip, normalize
+from moteur_traitement.analysis import Stats
+
 
 def parse_args() -> argparse.Namespace:
     """Lit les options données dans le terminal."""
@@ -57,19 +60,29 @@ def show_progress(done: int, total: int, nb_lines: int, start: float) -> None:
     )
 
 
-def read_and_count(path: str) -> dict[str, int]:
-    """Lit le fichier ligne par ligne et compte les lignes gardées."""
+def read_and_count(path: str, analyse: Stats) -> dict[str, int]:
+    """Lit le fichier ligne par ligne, nettoie et analyse les records."""
     total = os.path.getsize(path)
-    stats = {"lues": 0, "gardees": 0, "rejetees": 0}
+    stats = {"lues": 0, "rejetees": 0, "ip_invalides": 0, "gardees": 0}
     done = 0
     start = time.time()
     for line in read_many_files(path):
         done += len(line)
         stats["lues"] += 1
-        if parse_line(line) is None:
+
+        # Module 1 : découpe la ligne (None si elle est cassée).
+        record = parse_line(line)
+        if record is None:
             stats["rejetees"] += 1
+        # Module 2 : retire les IP invalides, puis nettoie les valeurs.
+        elif not is_valid_ip(record["ip"]):
+            stats["ip_invalides"] += 1
         else:
+            record = normalize(record)
             stats["gardees"] += 1
+            # Module 3 : ajoute le record à toutes les analyses.
+            analyse.update(record)
+
         if stats["lues"] % 50_000 == 0:
             show_progress(done, total, stats["lues"], start)
 
@@ -81,11 +94,32 @@ def read_and_count(path: str) -> dict[str, int]:
 def print_summary(stats: dict[str, int]) -> None:
     """Affiche le bilan du nettoyage."""
     lues = stats["lues"]
-    rejet = stats["rejetees"] / lues if lues else 0
+    if lues == 0:
+        print("\nAucune ligne lue.")
+        return
+    rejetees = stats["rejetees"]
+    ip_invalides = stats["ip_invalides"]
     print("\nBilan du nettoyage :")
-    print(f"  Lignes lues     : {lues:>12,}")
-    print(f"  Lignes gardées  : {stats['gardees']:>12,}")
-    print(f"  Lignes rejetées : {stats['rejetees']:>12,}  ({rejet:.1%})")
+    print(f"  Lignes lues           : {lues:>12,}")
+    print(f"  Lignes rejetées       : {rejetees:>12,}"
+          f"  ({rejetees / lues:.1%})")
+    print(f"  IP invalides retirées : {ip_invalides:>12,}"
+          f"  ({ip_invalides / lues:.1%})")
+    print(f"  Lignes gardées        : {stats['gardees']:>12,}")
+
+
+def print_analysis(analyse: Stats, blacklist: frozenset[str]) -> None:
+    """Affiche les résultats de l'analyse (Module 3)."""
+    comparaison = analyse.compare_with_blacklist(blacklist)
+    actives = comparaison["intersection"]
+    print("\nRésultats de l'analyse :")
+    print(f"  IP différentes          : {len(analyse.ips):>10,}")
+    print(f"  IP en erreur            : {len(analyse.error_ips):>10,}")
+    print(f"  IP blacklistées actives : {len(actives):>10,}")
+    print(f"  Attaques force brute    : {len(analyse.alerts):>10,}")
+    print("\n  Logs par niveau :")
+    for level in ("INFO", "WARNING", "ERROR", "CRITICAL"):
+        print(f"    {level:<10} {analyse.by_level[level]:>10,}")
 
 
 def main() -> None:
@@ -104,11 +138,13 @@ def main() -> None:
     blacklist = load_blacklist(args.blacklist)
     logging.debug("Blacklist chargée : %d IP", len(blacklist))
 
+    analyse = Stats(args.max_echecs)
     print(f"Analyse de {args.input}...")
-    stats = read_and_count(args.input)
+    stats = read_and_count(args.input, analyse)
+    analyse.log_summary()
     print_summary(stats)
+    print_analysis(analyse, blacklist)
 
 
 if __name__ == "__main__":
     main()
-    

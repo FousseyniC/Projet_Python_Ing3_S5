@@ -42,7 +42,7 @@ def test_read_many_files_accepte_un_chemin_seul(tmp_path):
     a = tmp_path / "a.log"
     a.write_text("a1\n", encoding="utf-8")
     assert list(read_many_files(str(a))) == ["a1\n"]
-    
+
 
 # Vérifie qu'un fichier absent est ignoré sans planter.
 def test_read_many_files_ignore_un_fichier_absent(tmp_path):

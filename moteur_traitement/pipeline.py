@@ -1,0 +1,124 @@
+"""Module 2 : nettoyage et routage des enregistrements."""
+
+import logging
+from collections.abc import Iterable, Iterator
+from typing import Any
+
+from moteur_traitement.constants import (
+    LEVEL_ALIASES,
+    NULL_USERS,
+    VALID_LEVELS,
+)
+
+logger = logging.getLogger(__name__)
+
+Record = dict[str, Any]
+# Clés dont la valeur est remise en minuscule ("FAILED" -> "failed").
+LOWER_VALUES = ("action", "status", "url")
+
+
+def is_valid_ip(ip: str) -> bool:
+    """Vérifie qu'une IP a 4 nombres entre 0 et 255."""
+    parts = ip.split(".")
+    return len(parts) == 4 and all(
+        part.isdigit() and int(part) <= 255 for part in parts
+    )
+
+
+def remove_invalid(
+    records: Iterable[Record | None],
+) -> Iterator[Record]:
+    """Supprime les None (lignes invalides) puis les IP invalides."""
+    valid = filter(None, records)
+    return filter(lambda r: is_valid_ip(r["ip"]), valid)
+
+
+def _clean(value: Any) -> Any:
+    """Enlève les espaces et transforme les valeurs nulles en None."""
+    if isinstance(value, str):
+        value = value.strip()
+        if value.lower() in NULL_USERS:
+            return None
+    return value
+
+
+def _clean_text(text: str) -> str:
+    """Nettoie un payload texte : guillemets, espaces, caractères parasites."""
+    # Tabulation et caractères de contrôle (\x07) deviennent des espaces.
+    text = "".join(c if c.isprintable() else " " for c in text)
+    text = " ".join(text.split()).strip('"')
+    return text.lower() if text.isupper() else text
+
+
+def _clean_payload(payload: Any) -> Any:
+    """Clés en minuscule, nombres en int, certaines valeurs en minuscule."""
+    if isinstance(payload, str):
+        return _clean_text(payload)
+    if not isinstance(payload, dict):
+        return payload
+    cleaned = {}
+    for key, value in payload.items():
+        key = str(key).lower()
+        if isinstance(value, str) and value.isdigit():
+            value = int(value)
+        elif isinstance(value, str) and key in LOWER_VALUES:
+            value = value.lower()
+        cleaned[key] = value
+    return cleaned
+
+
+def normalize(record: Record) -> Record:
+    """Nettoie un enregistrement : espaces, niveau, valeurs nulles."""
+    try:
+        cleaned = dict(record)  # copie : l'original reste intact
+        level = _clean(record.get("level"))
+        if isinstance(level, str):
+            level = level.upper()
+            level = LEVEL_ALIASES.get(level, level)
+        cleaned["level"] = level
+        user = _clean(record.get("user"))
+        if isinstance(user, str):
+            user = user.strip('"').lower()
+        cleaned["user"] = user
+
+        ip = _clean(record.get("ip"))
+        if isinstance(ip, str):
+            # 010.000.000.005 -> 10.0.0.5
+            ip = ".".join(str(int(part)) for part in ip.split("."))
+        cleaned["ip"] = ip
+
+        cleaned["payload"] = _clean_payload(record.get("payload"))
+        connection = record.get("connection")
+        if connection is not None:
+            # Même port et protocole, mais avec l'IP nettoyée.
+            cleaned["connection"] = (ip, connection[1], connection[2])
+    except (AttributeError, TypeError, ValueError):
+        # Entrée inattendue : le niveau None la fera rejeter plus loin.
+        return {"level": None}
+    return cleaned
+
+
+def filter_levels(records: Iterable[Record]) -> Iterator[Record]:
+    """Garde seulement les niveaux INFO, WARNING, ERROR, CRITICAL."""
+    return filter(lambda r: r.get("level") in VALID_LEVELS, records)
+
+
+def route(record: Record) -> tuple[str, str | None]:
+    """Classe un record selon la forme de son contenu (match-case)."""
+    match (record.get("payload"), record.get("connection")):
+        case (str() as text, _):
+            return ("text", text)
+        case (dict(), (ip, port, protocol)):
+            return ("connection", f"{ip}:{port}/{protocol}")
+        case ({"action": action}, None):
+            return ("action", action)
+        case ({"method": method}, None):
+            return ("web", method)
+        case _:
+            return ("unknown", None)
+
+
+def transform(records: Iterable[Record | None]) -> Iterator[Record]:
+    """Pipeline : filter(None), map(normalize), filter des niveaux."""
+    logger.debug("Construction du pipeline de transformation")
+    return filter_levels(map(normalize, remove_invalid(records)))
