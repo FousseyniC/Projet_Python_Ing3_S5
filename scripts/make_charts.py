@@ -32,6 +32,7 @@ def plot_levels(
     logger.debug("Graphique enregistré : %s", path)
     return path
 
+
 def _plot_top(
     counts: dict[str, int],
     title: str,
@@ -70,6 +71,8 @@ def plot_top_error_ips(
         "top_ip_erreur.png",
         output_dir,
     )
+
+
 def plot_attacks(
     alerts: dict[str, int],
     output_dir: Path = REPORT_DIR,
@@ -81,6 +84,8 @@ def plot_attacks(
         "attaques_force_brute.png",
         output_dir,
     )
+
+
 def main() -> None:
     """Démo avec de fausses données (remplacée par les vrais compteurs)."""
     logging.basicConfig(level=logging.DEBUG)
