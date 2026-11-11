@@ -11,7 +11,7 @@ from moteur_traitement.ingestion import (
     read_many_files,
 )
 
-from moteur_traitement.pipeline import is_valid_ip
+from moteur_traitement.pipeline import is_valid_ip, normalize
 
 
 def parse_args() -> argparse.Namespace:
@@ -73,10 +73,11 @@ def read_and_count(path: str) -> dict[str, int]:
         record = parse_line(line)
         if record is None:
             stats["rejetees"] += 1
-        # Module 2 : retire les IP invalides.
+        # Module 2 : retire les IP invalides, puis nettoie les valeurs.
         elif not is_valid_ip(record["ip"]):
             stats["ip_invalides"] += 1
         else:
+            record = normalize(record)
             stats["gardees"] += 1
 
         if stats["lues"] % 50_000 == 0:
