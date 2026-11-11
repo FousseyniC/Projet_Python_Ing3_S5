@@ -85,7 +85,8 @@ class Stats:
             return
 
         key = (record["ip"], record["user"])
-        if payload.get("status") == "failed":
+        status = payload.get("status")
+        if status == "failed":
             # Dernier échec trop ancien : c'est une nouvelle série.
             last = self.last_seen.get(key)
             if last is not None and record["timestamp"] - last > WINDOW:
@@ -95,7 +96,7 @@ class Stats:
             # == et pas >= : une seule alerte par attaque.
             if self.failures[key] == self.threshold:
                 self.alerts.append(key)
-        else:
+        elif status == "success":
             # Connexion réussie : on remet le compteur à zéro.
             self.failures.pop(key, None)
             self.last_seen.pop(key, None)
@@ -148,6 +149,6 @@ def detect_brute_force(
         for record in batch:
             if not isinstance(record["payload"], dict):
                 continue  # texte brut : ce n'est pas une connexion
-            stats.check_login(record)
+            stats.update(record)
 
     return stats.alerts
