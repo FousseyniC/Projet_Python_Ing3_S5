@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from moteur_traitement.pipeline import normalize
 from moteur_traitement.rules import (
     DEFAULT_BAN_STEPS,
     AlertSummary,
@@ -95,6 +96,13 @@ def test_blacklisted_ip_ignore_ip_propre():
     assert rule_blacklisted_ip(record, blacklist=frozenset()) is None
 
 
+def test_blacklisted_ip_avec_zeros_apres_normalize():
+    # Le Module 2 transforme 006.006.006.006 en 6.6.6.6.
+    record = normalize(make_record(ip="006.006.006.006"))
+    alert = rule_blacklisted_ip(record, blacklist=frozenset({"6.6.6.6"}))
+    assert alert is not None
+
+
 def test_blacklisted_ip_sans_blacklist_leve_une_erreur():
     with pytest.raises(KeyError):
         rule_blacklisted_ip(make_record())
@@ -136,9 +144,10 @@ def test_compte_sensible_depuis_l_exterieur():
     assert alert["rule"] == "sensitive_account"
 
 
-def test_compte_sensible_mal_ecrit_reconnu():
-    record = login("8.8.8.8", '"ROOT"', "SUCCESS")
-    assert rule_sensitive_account(record) is not None
+def test_compte_sensible_mal_ecrit_reconnu_apres_normalize():
+    payload = {"Action": "LOGIN", "Status": "SUCCESS", "Port": "22"}
+    record = make_record(user='"ROOT"', payload=payload)
+    assert rule_sensitive_account(normalize(record)) is not None
 
 
 @pytest.mark.parametrize(
@@ -189,6 +198,16 @@ def test_scan_ignore_pendant_la_sanction():
     rule = PortScanRule()
     run_scan(rule, "6.6.6.6", T0)
     assert run_scan(rule, "6.6.6.6", T0 + timedelta(hours=2)) == []
+
+
+def test_scan_statut_en_majuscule_apres_normalize():
+    rule = PortScanRule()
+    alerts = []
+    for port in range(1000, 1010):
+        record = blocked("6.6.6.6", port)
+        record["payload"]["status"] = "BLOCKED"
+        alerts.append(rule(normalize(record)))
+    assert alerts[-1]["rule"] == "port_scan"
 
 
 def test_scan_ignore_les_connexions_autorisees():

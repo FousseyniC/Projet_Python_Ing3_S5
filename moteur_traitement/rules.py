@@ -3,6 +3,9 @@
 Une règle reçoit un record et la configuration, puis renvoie une alerte
 ou None. apply_security_rules() regroupe les règles et renvoie une
 fonction check(record), appelée sur chaque record dans main.py.
+
+Les records doivent d'abord passer par normalize() (Module 2) : clés et
+valeurs du payload en minuscule, utilisateur propre, IP sans zéros.
 """
 
 from __future__ import annotations
@@ -67,12 +70,6 @@ def _make_alert(
     }
 
 
-def _get(payload: dict, key: str) -> str:
-    """Lit une clé du payload (« status » ou « Status »), en minuscule."""
-    value = payload.get(key, payload.get(key.capitalize()))
-    return str(value).lower()
-
-
 def _payload_text(payload: dict | str) -> str:
     """Renvoie le texte du payload dans lequel chercher une attaque."""
     if isinstance(payload, str):
@@ -113,15 +110,15 @@ def rule_injection(record: Record, **config: Any) -> Alert | None:
 def rule_sensitive_account(record: Record, **config: Any) -> Alert | None:
     """Alerte si un compte sensible se connecte depuis l'extérieur."""
     payload = record["payload"]
-    if not isinstance(payload, dict) or record["user"] is None:
+    if not isinstance(payload, dict):
         return None
-    user = record["user"].strip('"').lower()
+    user = record["user"]
     accounts = config.get("sensitive_accounts", SENSITIVE_ACCOUNTS)
     if user not in accounts:
         return None
-    if _get(payload, "action") != "login":
+    if payload.get("action") != "login":
         return None
-    if _get(payload, "status") != "success":
+    if payload.get("status") != "success":
         return None
     if _is_internal(record["ip"]):
         return None
@@ -172,7 +169,7 @@ class PortScanRule:
         connection = record["connection"]
         if connection is None or not isinstance(payload, dict):
             return None
-        if _get(payload, "status") != "blocked":
+        if payload.get("status") != "blocked":
             return None
 
         ip, port, _ = connection
