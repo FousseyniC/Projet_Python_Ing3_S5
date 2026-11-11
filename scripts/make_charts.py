@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
-REPORT_DIR = Path("report")
+REPORT_DIR = Path("rapport")
 LEVELS = ("INFO", "WARNING", "ERROR", "CRITICAL")
 COLORS = ("#4c9f70", "#e8a838", "#d9534f", "#7b1e1e")
 
