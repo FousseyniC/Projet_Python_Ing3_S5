@@ -25,32 +25,54 @@ from moteur_traitement.rules import (
 from moteur_traitement.audit import audit_scope
 from collections import defaultdict
 
+ECHANTILLON = "data/echantillon/server.log"
+COMPLET = "data/complet/server.log"
+
 
 def parse_args() -> argparse.Namespace:
     """Lit les options données dans le terminal."""
     parser = argparse.ArgumentParser(description="Analyse de logs")
-    parser.add_argument(
+    # -i et -c ne peuvent pas être utilisés ensemble.
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument(
+        "-i",
         "--input",
-        default="data/echantillon/server.log",
-        help="fichier de logs à analyser",
+        default=ECHANTILLON,
+        help="fichier de logs à analyser (par défaut : l'échantillon)",
+    )
+    source.add_argument(
+        "-c",
+        "--complet",
+        action="store_true",
+        help=f"analyse le jeu complet ({COMPLET})",
     )
     parser.add_argument(
+        "-b",
         "--blacklist",
-        default="data/echantillon/blacklist.txt",
-        help="liste noire (une IP par ligne)",
+        help="liste noire (par défaut : blacklist.txt à côté des logs)",
     )
     parser.add_argument(
+        "-m",
         "--max-echecs",
         type=int,
         default=5,
         help="nombre d'échecs de connexion d'affilée avant une alerte",
     )
     parser.add_argument(
+        "-g",
         "--graphiques",
         action="store_true",
         help="crée les graphiques du rapport dans le dossier rapport/",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if args.complet:
+        args.input = COMPLET
+    # Sans -b, on prend le blacklist.txt du même dossier que les logs.
+    if args.blacklist is None:
+        dossier = os.path.dirname(args.input)
+        args.blacklist = os.path.join(dossier, "blacklist.txt")
+    return args
 
 
 def setup_logging() -> None:
