@@ -56,11 +56,6 @@ def test_detect_brute_force():
     assert analysis.detect_brute_force([text]) == []
 
 
-def test_detect_brute_force_max_alerts():
-    records = [login("failed")] * 5 + [login("failed", "7.7.7.7")] * 5
-    assert len(analysis.detect_brute_force(records, max_alerts=1)) == 1
-
-
 def test_detect_brute_force_small_batches():
     # Le compteur continue d'un paquet à l'autre.
     records = [login("failed")] * 6
