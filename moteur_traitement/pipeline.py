@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Iterable, Iterator
 from typing import Any
+
 from moteur_traitement.constants import (
     LEVEL_ALIASES,
     NULL_USERS,
@@ -12,13 +13,20 @@ from moteur_traitement.constants import (
 logger = logging.getLogger(__name__)
 
 Record = dict[str, Any]
+def is_valid_ip(ip: str) -> bool:
+    """Vérifie qu'une IP a 4 nombres entre 0 et 255."""
+    parts = ip.split(".")
+    return len(parts) == 4 and all(
+        part.isdigit() and int(part) <= 255 for part in parts
+    )
 
 
 def remove_invalid(
     records: Iterable[Record | None],
 ) -> Iterator[Record]:
-    """Supprime les None produits par parse_line() (lignes invalides)."""
-    return filter(None, records)
+    """Supprime les None (lignes invalides) puis les IP invalides."""
+    valid = filter(None, records)
+    return filter(lambda r: is_valid_ip(r["ip"]), valid)
 
 def _clean(value: Any) -> Any:
     """Enlève les espaces et transforme les valeurs nulles en None."""

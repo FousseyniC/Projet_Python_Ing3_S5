@@ -2,6 +2,7 @@
 
 from moteur_traitement.pipeline import (
     filter_levels,
+    is_valid_ip,
     normalize,
     remove_invalid,
     route,
@@ -10,11 +11,24 @@ from moteur_traitement.pipeline import (
 
 
 def test_remove_invalid_supprime_les_none():
-    data = [{"level": "INFO"}, None, {"level": "ERROR"}, None]
+    data = [{"ip": "1.1.1.1"}, None, {"ip": "2.2.2.2"}, None]
     assert list(remove_invalid(data)) == [
-        {"level": "INFO"},
-        {"level": "ERROR"},
+        {"ip": "1.1.1.1"},
+        {"ip": "2.2.2.2"},
     ]
+
+
+def test_remove_invalid_supprime_les_ip_invalides():
+    data = [{"ip": "999.300.1.1"}, {"ip": "localhost"}, {"ip": "10.0.0.5"}]
+    assert list(remove_invalid(data)) == [{"ip": "10.0.0.5"}]
+
+
+def test_is_valid_ip():
+    assert is_valid_ip("10.0.0.5")
+    assert is_valid_ip("010.000.000.005")
+    assert not is_valid_ip("999.300.1.1")
+    assert not is_valid_ip("10.0.0")
+    assert not is_valid_ip("unknown")
 
 def test_normalize_niveau_en_majuscules():
     result = normalize({"level": " info ", "ip": "1.2.3.4", "user": "u1"})
