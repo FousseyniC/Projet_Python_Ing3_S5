@@ -152,6 +152,25 @@ def invalid_lines() -> list[str]:
 
 
 @pytest.fixture
+def injection_record() -> dict:
+    """Tentative d'injection SQL, déjà parsée (Module 4)."""
+    return {
+        "timestamp": datetime(2026, 1, 1, 0, 30, 12),
+        "level": "WARNING",
+        "ip": "45.33.12.9",
+        "user": None,
+        "payload": {
+            "attack": "injection",
+            "content": "' OR 1=1 --",
+            "url": "/login",
+            "port": 443,
+            "protocol": "HTTPS",
+        },
+        "connection": ("45.33.12.9", 443, "HTTPS"),
+    }
+
+
+@pytest.fixture
 def bad_ip_lines() -> list[str]:
     """IP invalides : gardées par le Module 1, retirées par le Module 2."""
     return [

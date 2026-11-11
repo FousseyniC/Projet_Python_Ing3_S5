@@ -1,0 +1,8 @@
+# Règles de style de l'équipe (PEP8 strict : 79 caractères par ligne).
+
+[tool.black]
+line-length = 79
+target-version = ["py310"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
