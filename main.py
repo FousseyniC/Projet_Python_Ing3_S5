@@ -108,6 +108,20 @@ def print_summary(stats: dict[str, int]) -> None:
     print(f"  Lignes gardées        : {stats['gardees']:>12,}")
 
 
+def print_analysis(analyse: Stats, blacklist: frozenset[str]) -> None:
+    """Affiche les résultats de l'analyse (Module 3)."""
+    comparaison = analyse.compare_with_blacklist(blacklist)
+    actives = comparaison["intersection"]
+    print("\nRésultats de l'analyse :")
+    print(f"  IP différentes          : {len(analyse.ips):>10,}")
+    print(f"  IP en erreur            : {len(analyse.error_ips):>10,}")
+    print(f"  IP blacklistées actives : {len(actives):>10,}")
+    print(f"  Attaques force brute    : {len(analyse.alerts):>10,}")
+    print("\n  Logs par niveau :")
+    for level in ("INFO", "WARNING", "ERROR", "CRITICAL"):
+        print(f"    {level:<10} {analyse.by_level[level]:>10,}")
+
+
 def main() -> None:
     """Lance le programme."""
     setup_logging()
@@ -129,6 +143,7 @@ def main() -> None:
     stats = read_and_count(args.input, analyse)
     analyse.log_summary()
     print_summary(stats)
+    print_analysis(analyse, blacklist)
 
 
 if __name__ == "__main__":
