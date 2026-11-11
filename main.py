@@ -12,6 +12,7 @@ from moteur_traitement.ingestion import (
 )
 
 from moteur_traitement.pipeline import is_valid_ip, normalize
+from moteur_traitement.analysis import Stats
 
 
 def parse_args() -> argparse.Namespace:
@@ -59,8 +60,8 @@ def show_progress(done: int, total: int, nb_lines: int, start: float) -> None:
     )
 
 
-def read_and_count(path: str) -> dict[str, int]:
-    """Lit le fichier ligne par ligne, nettoie et compte les records."""
+def read_and_count(path: str, analyse: Stats) -> dict[str, int]:
+    """Lit le fichier ligne par ligne, nettoie et analyse les records."""
     total = os.path.getsize(path)
     stats = {"lues": 0, "rejetees": 0, "ip_invalides": 0, "gardees": 0}
     done = 0
@@ -79,6 +80,8 @@ def read_and_count(path: str) -> dict[str, int]:
         else:
             record = normalize(record)
             stats["gardees"] += 1
+            # Module 3 : ajoute le record à toutes les analyses.
+            analyse.update(record)
 
         if stats["lues"] % 50_000 == 0:
             show_progress(done, total, stats["lues"], start)
@@ -105,6 +108,20 @@ def print_summary(stats: dict[str, int]) -> None:
     print(f"  Lignes gardées        : {stats['gardees']:>12,}")
 
 
+def print_analysis(analyse: Stats, blacklist: frozenset[str]) -> None:
+    """Affiche les résultats de l'analyse (Module 3)."""
+    comparaison = analyse.compare_with_blacklist(blacklist)
+    actives = comparaison["intersection"]
+    print("\nRésultats de l'analyse :")
+    print(f"  IP différentes          : {len(analyse.ips):>10,}")
+    print(f"  IP en erreur            : {len(analyse.error_ips):>10,}")
+    print(f"  IP blacklistées actives : {len(actives):>10,}")
+    print(f"  Attaques force brute    : {len(analyse.alerts):>10,}")
+    print("\n  Logs par niveau :")
+    for level in ("INFO", "WARNING", "ERROR", "CRITICAL"):
+        print(f"    {level:<10} {analyse.by_level[level]:>10,}")
+
+
 def main() -> None:
     """Lance le programme."""
     setup_logging()
@@ -121,9 +138,12 @@ def main() -> None:
     blacklist = load_blacklist(args.blacklist)
     logging.debug("Blacklist chargée : %d IP", len(blacklist))
 
+    analyse = Stats(args.max_echecs)
     print(f"Analyse de {args.input}...")
-    stats = read_and_count(args.input)
+    stats = read_and_count(args.input, analyse)
+    analyse.log_summary()
     print_summary(stats)
+    print_analysis(analyse, blacklist)
 
 
 if __name__ == "__main__":
