@@ -22,6 +22,7 @@ from moteur_traitement.rules import (
     rule_injection,
     rule_sensitive_account,
 )
+from moteur_traitement.audit import audit_scope
 
 
 def parse_args() -> argparse.Namespace:
@@ -181,6 +182,11 @@ def main() -> None:
     print_summary(stats)
     print_analysis(analyse, blacklist)
     print_alerts(summary, scan_rule)
+    # Module 4 : audit des variables en mémoire (globals / locals).
+    alerts = summary.as_dict()
+    alerts["bans"] = scan_rule.bans()
+    audit_scope(globals(), locals(), alerts, "audit_report.json")
+    print("\nRapport d'audit : audit_report.json")
 
 
 if __name__ == "__main__":
