@@ -68,27 +68,36 @@ def parse_line(line: str) -> Record | None:
     La fonction ne lève jamais d'exception : toute ligne qu'on ne sait pas
     lire donne None.
     """
+    record, _ = parse_line_with_reason(line)
+    return record
+
+
+def parse_line_with_reason(line: str) -> tuple[Record | None, str | None]:
+    """Comme parse_line, mais renvoie aussi la cause du rejet.
+
+    Renvoie (record, None) si la ligne est valide, (None, cause) sinon.
+    """
     line = line.strip()
     if not line:
-        return None
+        return None, "ligne vide"
 
     # maxsplit=4 : un « | » à l'intérieur du payload ne le coupe pas.
     parts = [part.strip() for part in line.split("|", 4)]
     if len(parts) != 5:
-        return None
+        return None, "nombre de champs incorrect"
     date_text, level_text, ip, user_text, payload_text = parts
 
     timestamp = _parse_timestamp(date_text)
     if timestamp is None:
-        return None
+        return None, "date invalide"
     level = _parse_level(level_text)
     if level is None:
-        return None
+        return None, "niveau inconnu"
     if not ip:
-        return None
+        return None, "IP vide"
 
     payload = _parse_payload(payload_text)
-    return {
+    record = {
         "timestamp": timestamp,
         "level": level,
         "ip": ip,
@@ -96,6 +105,7 @@ def parse_line(line: str) -> Record | None:
         "payload": payload,
         "connection": _extract_connection(ip, payload),
     }
+    return record, None
 
 
 def read_records(paths: PathLike | Iterable[PathLike]) -> Iterator[Record | None]:

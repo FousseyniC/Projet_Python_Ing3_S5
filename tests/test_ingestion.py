@@ -9,6 +9,7 @@ import pytest
 from moteur_traitement.ingestion import (
     load_blacklist,
     parse_line,
+    parse_line_with_reason,
     read_log_file,
     read_many_files,
     read_records,
@@ -86,6 +87,16 @@ def test_connection_est_un_tuple(sample_lines):
     record = parse_line(sample_lines[0])
     assert record["connection"] == ("197.125.255.225", 22, "SSH")
     assert isinstance(record["connection"], tuple)
+
+
+# Vérifie que chaque ligne rejetée a une cause, et les lignes valides aucune.
+def test_parse_line_with_reason(sample_lines, invalid_lines):
+    for line in sample_lines:
+        assert parse_line_with_reason(line)[1] is None
+    for line in invalid_lines:
+        record, cause = parse_line_with_reason(line)
+        assert record is None
+        assert cause is not None, repr(line)
 
 
 # --- read_records et load_blacklist ---

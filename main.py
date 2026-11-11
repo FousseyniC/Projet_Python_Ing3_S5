@@ -4,13 +4,15 @@ import argparse
 import logging
 import os
 import time
+from collections import defaultdict
+from collections.abc import Iterable, Iterator
 
 from moteur_traitement.ingestion import (
     load_blacklist,
-    parse_line,
+    parse_line_with_reason,
     read_many_files,
 )
-from moteur_traitement.pipeline import is_valid_ip, normalize
+from moteur_traitement.pipeline import route, transform
 from moteur_traitement.analysis import Stats
 from moteur_traitement.rules import (
     AlertSummary,
@@ -23,7 +25,6 @@ from moteur_traitement.rules import (
     rule_sensitive_account,
 )
 from moteur_traitement.audit import audit_scope
-from collections import defaultdict
 
 ECHANTILLON = "data/echantillon/server.log"
 COMPLET = "data/complet/server.log"
@@ -86,19 +87,75 @@ def setup_logging() -> None:
     logging.getLogger("PIL").setLevel(logging.WARNING)
 
 
-def show_progress(done: int, total: int, nb_lines: int, start: float) -> None:
-    """Affiche une barre d'avancement sur une seule ligne."""
+def short(n: float) -> str:
+    """Écrit un grand nombre en version courte : 507 k, 33.4 M."""
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f} M"
+    if n >= 1_000:
+        return f"{n / 1_000:.0f} k"
+    return str(int(n))
+
+
+def format_duration(seconds: float) -> str:
+    """Écrit une durée en minutes et secondes : 11 min 05 s."""
+    minutes, secondes = divmod(int(seconds), 60)
+    if minutes == 0:
+        return f"{secondes} s"
+    return f"{minutes} min {secondes:02d} s"
+
+
+def show_progress(
+    done: int,
+    total: int,
+    stats: dict[str, int],
+    analyse: Stats,
+    summary: AlertSummary,
+    start: float,
+) -> None:
+    """Affiche l'avancement et les résultats en direct, sur une ligne."""
     ratio = min(done / total, 1) if total else 1
-    bar = "#" * int(ratio * 30) + "-" * (30 - int(ratio * 30))
+    bar = "#" * int(ratio * 10) + "-" * (10 - int(ratio * 10))
     elapsed = time.time() - start
-    speed = nb_lines / elapsed if elapsed else 0
+    speed = stats["lues"] / elapsed if elapsed else 0
     remaining = elapsed * (1 - ratio) / ratio if ratio else 0
+    # Temps restant arrondi à la minute, pour garder la ligne courte.
+    if remaining >= 60:
+        reste = f"{int(remaining // 60)} min"
+    else:
+        reste = f"{int(remaining)} s"
     print(
-        f"\r[{bar}] {ratio:6.1%}  {nb_lines:,} lignes  "
-        f"{speed:,.0f} lignes/s  reste ~{remaining:.0f} s   ",
+        f"\r[{bar}] {ratio:4.0%} {short(stats['lues'])} lignes "
+        f"{short(speed)}/s reste {reste}"
+        f" | rejets {short(stats['rejetees'])}"
+        f" | IP inv. {short(ip_invalides(stats))}"
+        f" | attaques {short(len(analyse.alerts))}"
+        f" | alertes {short(summary.total)} ",
         end="",
         flush=True,
     )
+
+
+def ip_invalides(stats: dict) -> int:
+    """Lignes lues, ni rejetées ni gardées : retirées par le Module 2."""
+    return stats["lues"] - stats["rejetees"] - stats["gardees"]
+
+
+def count_lines(lines: Iterable[str], stats: dict) -> Iterator[str]:
+    """Laisse passer les lignes en comptant leur nombre et leur taille."""
+    for line in lines:
+        stats["lues"] += 1
+        stats["octets"] += len(line)
+        yield line
+
+
+def count_rejects(parsed: Iterable[tuple], stats: dict) -> Iterator[dict]:
+    """Laisse passer les records valides, compte les rejets par cause."""
+    for record, cause in parsed:
+        if record is None:
+            stats["rejetees"] += 1
+            stats["causes"][cause] += 1
+        else:
+            yield record
 
 
 def read_and_count(
@@ -106,39 +163,45 @@ def read_and_count(
     analyse: Stats,
     check: RuleChecker,
     summary: AlertSummary,
-) -> dict[str, int]:
-    """Lit le fichier ligne par ligne, nettoie et analyse les records."""
+) -> dict:
+    """Lit, nettoie et analyse les logs avec une chaîne de générateurs."""
     total = os.path.getsize(path)
-    stats = {"lues": 0, "rejetees": 0, "ip_invalides": 0, "gardees": 0}
-    done = 0
+    stats = {"lues": 0, "octets": 0, "rejetees": 0, "gardees": 0}
+    stats["causes"] = defaultdict(int)
+    stats["types"] = defaultdict(int)
     start = time.time()
-    for line in read_many_files(path):
-        done += len(line)
-        stats["lues"] += 1
 
-        # Module 1 : découpe la ligne (None si elle est cassée).
-        record = parse_line(line)
-        if record is None:
-            stats["rejetees"] += 1
-        # Module 2 : retire les IP invalides, puis nettoie les valeurs.
-        elif not is_valid_ip(record["ip"]):
-            stats["ip_invalides"] += 1
-        else:
-            record = normalize(record)
-            stats["gardees"] += 1
-            # Module 3 : ajoute le record à toutes les analyses.
-            analyse.update(record)
-            # Module 4 : applique les règles de sécurité.
-            summary.update(check(record))
-        if stats["lues"] % 50_000 == 0:
-            show_progress(done, total, stats["lues"], start)
+    # Chaîne paresseuse : chaque ligne traverse toutes les étapes une par
+    # une, sans que le fichier soit jamais chargé en mémoire.
+    # Module 1 : yield / yield from, puis map pour parser chaque ligne.
+    lines = count_lines(read_many_files(path), stats)
+    parsed = map(parse_line_with_reason, lines)
+    records = count_rejects(parsed, stats)
+    # Module 2 : filter + lambda (IP invalides, niveaux), map (normalize).
+    cleaned = transform(records)
 
-    show_progress(total, total, stats["lues"], start)
+    next_update = 50_000
+    for record in cleaned:
+        stats["gardees"] += 1
+        # Module 2 : match-case pour classer le type d'événement.
+        kind, _ = route(record)
+        stats["types"][kind] += 1
+        # Module 3 : ajoute le record à toutes les analyses.
+        analyse.update(record)
+        # Module 4 : applique les règles de sécurité.
+        summary.update(check(record))
+        if stats["lues"] >= next_update:
+            show_progress(stats["octets"], total, stats, analyse,
+                          summary, start)
+            next_update += 50_000
+
+    show_progress(total, total, stats, analyse, summary, start)
     print()
+    stats["ip_invalides"] = ip_invalides(stats)
     return stats
 
 
-def print_summary(stats: dict[str, int]) -> None:
+def print_summary(stats: dict) -> None:
     """Affiche le bilan du nettoyage."""
     lues = stats["lues"]
     if lues == 0:
@@ -150,20 +213,61 @@ def print_summary(stats: dict[str, int]) -> None:
     print(f"  Lignes lues           : {lues:>12,}")
     print(f"  Lignes rejetées       : {rejetees:>12,}"
           f"  ({rejetees / lues:.1%})")
+    # Détail des rejets, de la cause la plus fréquente à la plus rare.
+    causes = sorted(
+        stats["causes"].items(), key=lambda item: item[1], reverse=True
+    )
+    for cause, nb in causes:
+        print(f"    - {cause:<26} {nb:>10,}")
     print(f"  IP invalides retirées : {ip_invalides:>12,}"
           f"  ({ip_invalides / lues:.1%})")
     print(f"  Lignes gardées        : {stats['gardees']:>12,}")
 
 
+TYPE_NAMES = {
+    "connection": "connexions réseau",
+    "text": "messages texte",
+    "action": "actions",
+    "web": "requêtes web",
+    "unknown": "autres",
+}
+
+
+def print_types(stats: dict) -> None:
+    """Affiche les types d'événements trouvés par route() (match-case)."""
+    print("\nTypes d'événements (match-case) :")
+    types = sorted(
+        stats["types"].items(), key=lambda item: item[1], reverse=True
+    )
+    for kind, nb in types:
+        print(f"  {TYPE_NAMES.get(kind, kind):<22} {nb:>12,}")
+
+
+def examples(ips: set[str]) -> str:
+    """Renvoie 3 IP d'exemple, triées, pour l'affichage."""
+    return ", ".join(sorted(ips)[:3])
+
+
 def print_analysis(analyse: Stats, blacklist: frozenset[str]) -> None:
     """Affiche les résultats de l'analyse (Module 3)."""
-    comparaison = analyse.compare_with_blacklist(blacklist)
-    actives = comparaison["intersection"]
     print("\nRésultats de l'analyse :")
     print(f"  IP différentes          : {len(analyse.ips):>10,}")
     print(f"  IP en erreur            : {len(analyse.error_ips):>10,}")
-    print(f"  IP blacklistées actives : {len(actives):>10,}")
     print(f"  Attaques force brute    : {len(analyse.alerts):>10,}")
+
+    # Les 4 opérations d'ensembles entre les IP vues et la blacklist.
+    comparaison = analyse.compare_with_blacklist(blacklist)
+    print("\n  IP vues comparées à la blacklist :")
+    noms = {
+        "union": "union (|)",
+        "intersection": "intersection (&)",
+        "difference": "différence (-)",
+        "symmetric_difference": "diff. symétrique (^)",
+    }
+    for cle, nom in noms.items():
+        ips = comparaison[cle]
+        print(f"    {nom:<21} {len(ips):>8,}   ex. {examples(ips)}")
+
     print("\n  Logs par niveau :")
     for level in ("INFO", "WARNING", "ERROR", "CRITICAL"):
         print(f"    {level:<10} {analyse.by_level[level]:>10,}")
@@ -203,6 +307,7 @@ def make_charts(analyse: Stats) -> None:
 
 def main() -> None:
     """Lance le programme."""
+    start = time.time()
     setup_logging()
     args = parse_args()
     logging.debug("Options reçues : %s", vars(args))
@@ -234,6 +339,7 @@ def main() -> None:
     analyse.log_summary()
     summary.log_summary()
     print_summary(stats)
+    print_types(stats)
     print_analysis(analyse, blacklist)
     print_alerts(summary, scan_rule)
     # Module 4 : audit des variables en mémoire (globals / locals).
@@ -244,6 +350,11 @@ def main() -> None:
     if args.graphiques:
         make_charts(analyse)
 
+    print(f"\nTerminé en {format_duration(time.time() - start)}")
+
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nAnalyse interrompue par l'utilisateur.")
