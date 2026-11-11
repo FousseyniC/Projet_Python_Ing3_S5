@@ -122,3 +122,10 @@ def test_vieil_echec_ne_compte_plus():
     new["timestamp"] = datetime(2026, 1, 1, 1, 0)
     records = [old] * 4 + [new] * 4
     assert analysis.detect_brute_force(records) == []
+
+
+def test_statut_inconnu_ne_remet_pas_a_zero():
+    # Seule une connexion réussie remet le compteur à zéro.
+    fail = login("failed")
+    records = [fail] * 3 + [login("unknown")] + [fail] * 2
+    assert analysis.detect_brute_force(records) == [("6.6.6.6", "bob")]
