@@ -12,6 +12,7 @@ from moteur_traitement.ingestion import (
 )
 
 from moteur_traitement.pipeline import is_valid_ip, normalize
+from moteur_traitement.analysis import Stats
 
 
 def parse_args() -> argparse.Namespace:
@@ -59,8 +60,8 @@ def show_progress(done: int, total: int, nb_lines: int, start: float) -> None:
     )
 
 
-def read_and_count(path: str) -> dict[str, int]:
-    """Lit le fichier ligne par ligne, nettoie et compte les records."""
+def read_and_count(path: str, analyse: Stats) -> dict[str, int]:
+    """Lit le fichier ligne par ligne, nettoie et analyse les records."""
     total = os.path.getsize(path)
     stats = {"lues": 0, "rejetees": 0, "ip_invalides": 0, "gardees": 0}
     done = 0
@@ -79,6 +80,8 @@ def read_and_count(path: str) -> dict[str, int]:
         else:
             record = normalize(record)
             stats["gardees"] += 1
+            # Module 3 : ajoute le record à toutes les analyses.
+            analyse.update(record)
 
         if stats["lues"] % 50_000 == 0:
             show_progress(done, total, stats["lues"], start)
@@ -121,8 +124,10 @@ def main() -> None:
     blacklist = load_blacklist(args.blacklist)
     logging.debug("Blacklist chargée : %d IP", len(blacklist))
 
+    analyse = Stats(args.max_echecs)
     print(f"Analyse de {args.input}...")
-    stats = read_and_count(args.input)
+    stats = read_and_count(args.input, analyse)
+    analyse.log_summary()
     print_summary(stats)
 
 
