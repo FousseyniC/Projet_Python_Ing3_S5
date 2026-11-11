@@ -108,8 +108,10 @@ def parse_line_with_reason(line: str) -> tuple[Record | None, str | None]:
     return record, None
 
 
-def read_records(paths: PathLike | Iterable[PathLike]) -> Iterator[Record | None]:
-    """Lit les fichiers et renvoie leurs records au fil de l'eau (None compris)."""
+def read_records(
+    paths: PathLike | Iterable[PathLike],
+) -> Iterator[Record | None]:
+    """Lit les fichiers et renvoie leurs records (None compris)."""
     return map(parse_line, read_many_files(paths))
 
 
@@ -146,22 +148,28 @@ def _parse_user(text: str) -> str | None:
 
 
 def _parse_payload(text: str) -> dict | str:
-    """Renvoie un dict si le payload est du JSON (ou un dict Python), sinon le texte."""
+    """Renvoie un dict si le payload est du JSON ou un dict Python.
+
+    Sinon, renvoie le texte tel quel.
+    """
     if not text.startswith("{"):
         return text
     try:
         value = json.loads(text)
     except (json.JSONDecodeError, RecursionError):
-        # Les dicts écrits à la Python ({'port': 22}) ne sont pas du JSON valide.
+        # Un dict écrit à la Python ({'port': 22}) n'est pas du JSON.
         try:
             value = ast.literal_eval(text)
-        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+        except (ValueError, TypeError, SyntaxError,
+                MemoryError, RecursionError):
             return text
     return value if isinstance(value, dict) else text
 
 
-def _extract_connection(ip: str, payload: dict | str) -> tuple[str, int, str] | None:
-    """Construit (ip, port, PROTOCOLE) si le payload contient un port et un protocole."""
+def _extract_connection(
+    ip: str, payload: dict | str,
+) -> tuple[str, int, str] | None:
+    """Renvoie (ip, port, PROTOCOLE), ou None si le payload est incomplet."""
     if not isinstance(payload, dict):
         return None
     # Les clés peuvent être en majuscule (« Port », « Protocol »).
