@@ -137,6 +137,15 @@ def print_analysis(analyse: Stats, blacklist: frozenset[str]) -> None:
         print(f"    {level:<10} {analyse.by_level[level]:>10,}")
 
 
+def print_alerts(summary: AlertSummary, scan_rule: PortScanRule) -> None:
+    """Affiche le bilan des alertes de sécurité (Module 4)."""
+    print("\nAlertes de sécurité :")
+    print(f"  Total                   : {summary.total:>10,}")
+    for rule, nb in summary.by_rule.items():
+        print(f"    {rule:<21} {nb:>10,}")
+    print(f"  IP sanctionnées (scan)  : {len(scan_rule.bans()):>10,}")
+
+
 def main() -> None:
     """Lance le programme."""
     setup_logging()
@@ -171,6 +180,7 @@ def main() -> None:
     summary.log_summary()
     print_summary(stats)
     print_analysis(analyse, blacklist)
+    print_alerts(summary, scan_rule)
 
 
 if __name__ == "__main__":
