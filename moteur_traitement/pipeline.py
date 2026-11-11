@@ -46,8 +46,21 @@ def normalize(record: Record) -> Record:
             level = level.upper()
             level = LEVEL_ALIASES.get(level, level)
         cleaned["level"] = level
-        cleaned["user"] = _clean(record.get("user"))
-        cleaned["ip"] = _clean(record.get("ip"))
+        user = _clean(record.get("user"))
+        if isinstance(user, str):
+            user = user.strip('"').lower()
+        cleaned["user"] = user
+
+        ip = _clean(record.get("ip"))
+        if isinstance(ip, str):
+            # 010.000.000.005 -> 10.0.0.5
+            ip = ".".join(str(int(part)) for part in ip.split("."))
+        cleaned["ip"] = ip
+
+        connection = record.get("connection")
+        if connection is not None:
+            # Même port et protocole, mais avec l'IP nettoyée.
+            cleaned["connection"] = (ip, connection[1], connection[2])
     except (AttributeError, TypeError, ValueError):
         # Entrée inattendue : le niveau None la fera rejeter plus loin.
         return {"level": None}

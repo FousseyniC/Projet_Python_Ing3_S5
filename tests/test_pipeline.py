@@ -107,3 +107,25 @@ def test_transform_reste_paresseux():
     flux = (r for r in [{"level": "INFO", "ip": "1.1.1.1", "user": None}])
     result = transform(flux)
     assert iter(result) is result
+
+def test_normalize_utilisateur_en_minuscule():
+    for user in ("BOB46", "Bob46", '"bob46"', "  bob46 "):
+        result = normalize({"level": "INFO", "ip": "1.2.3.4", "user": user})
+        assert result["user"] == "bob46"
+
+
+def test_normalize_ip_sans_zeros():
+    result = normalize(
+        {"level": "INFO", "ip": "010.000.000.005", "user": "u1"}
+    )
+    assert result["ip"] == "10.0.0.5"
+
+
+def test_normalize_reconstruit_connection():
+    record = {
+        "level": "INFO",
+        "ip": "010.000.000.005",
+        "user": "u1",
+        "connection": ("010.000.000.005", 22, "SSH"),
+    }
+    assert normalize(record)["connection"] == ("10.0.0.5", 22, "SSH")
