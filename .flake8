@@ -1,0 +1,6 @@
+# flake8 ne lit pas pyproject.toml : ses règles sont ici.
+[flake8]
+max-line-length = 79
+extend-exclude = venv,.venv,data
+# E203 : espace avant « : », en conflit avec black.
+extend-ignore = E203
