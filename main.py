@@ -11,6 +11,8 @@ from moteur_traitement.ingestion import (
     read_many_files,
 )
 
+from moteur_traitement.pipeline import is_valid_ip
+
 
 def parse_args() -> argparse.Namespace:
     """Lit les options données dans le terminal."""
@@ -58,18 +60,25 @@ def show_progress(done: int, total: int, nb_lines: int, start: float) -> None:
 
 
 def read_and_count(path: str) -> dict[str, int]:
-    """Lit le fichier ligne par ligne et compte les lignes gardées."""
+    """Lit le fichier ligne par ligne, nettoie et compte les records."""
     total = os.path.getsize(path)
-    stats = {"lues": 0, "gardees": 0, "rejetees": 0}
+    stats = {"lues": 0, "rejetees": 0, "ip_invalides": 0, "gardees": 0}
     done = 0
     start = time.time()
     for line in read_many_files(path):
         done += len(line)
         stats["lues"] += 1
-        if parse_line(line) is None:
+
+        # Module 1 : découpe la ligne (None si elle est cassée).
+        record = parse_line(line)
+        if record is None:
             stats["rejetees"] += 1
+        # Module 2 : retire les IP invalides.
+        elif not is_valid_ip(record["ip"]):
+            stats["ip_invalides"] += 1
         else:
             stats["gardees"] += 1
+
         if stats["lues"] % 50_000 == 0:
             show_progress(done, total, stats["lues"], start)
 
@@ -81,11 +90,18 @@ def read_and_count(path: str) -> dict[str, int]:
 def print_summary(stats: dict[str, int]) -> None:
     """Affiche le bilan du nettoyage."""
     lues = stats["lues"]
-    rejet = stats["rejetees"] / lues if lues else 0
+    if lues == 0:
+        print("\nAucune ligne lue.")
+        return
+    rejetees = stats["rejetees"]
+    ip_invalides = stats["ip_invalides"]
     print("\nBilan du nettoyage :")
-    print(f"  Lignes lues     : {lues:>12,}")
-    print(f"  Lignes gardées  : {stats['gardees']:>12,}")
-    print(f"  Lignes rejetées : {stats['rejetees']:>12,}  ({rejet:.1%})")
+    print(f"  Lignes lues           : {lues:>12,}")
+    print(f"  Lignes rejetées       : {rejetees:>12,}"
+          f"  ({rejetees / lues:.1%})")
+    print(f"  IP invalides retirées : {ip_invalides:>12,}"
+          f"  ({ip_invalides / lues:.1%})")
+    print(f"  Lignes gardées        : {stats['gardees']:>12,}")
 
 
 def main() -> None:
