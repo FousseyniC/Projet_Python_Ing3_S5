@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 Record = dict[str, Any]
 # Clés dont la valeur est remise en minuscule ("FAILED" -> "failed").
 LOWER_VALUES = ("action", "status", "url")
+
+
 def is_valid_ip(ip: str) -> bool:
     """Vérifie qu'une IP a 4 nombres entre 0 et 255."""
     parts = ip.split(".")
@@ -30,6 +32,7 @@ def remove_invalid(
     valid = filter(None, records)
     return filter(lambda r: is_valid_ip(r["ip"]), valid)
 
+
 def _clean(value: Any) -> Any:
     """Enlève les espaces et transforme les valeurs nulles en None."""
     if isinstance(value, str):
@@ -37,6 +40,8 @@ def _clean(value: Any) -> Any:
         if value.lower() in NULL_USERS:
             return None
     return value
+
+
 def _clean_text(text: str) -> str:
     """Nettoie un payload texte : guillemets, espaces, caractères parasites."""
     # Tabulation et caractères de contrôle (\x07) deviennent des espaces.
@@ -81,7 +86,7 @@ def normalize(record: Record) -> Record:
             # 010.000.000.005 -> 10.0.0.5
             ip = ".".join(str(int(part)) for part in ip.split("."))
         cleaned["ip"] = ip
-        
+
         cleaned["payload"] = _clean_payload(record.get("payload"))
         connection = record.get("connection")
         if connection is not None:
@@ -92,9 +97,12 @@ def normalize(record: Record) -> Record:
         return {"level": None}
     return cleaned
 
+
 def filter_levels(records: Iterable[Record]) -> Iterator[Record]:
     """Garde seulement les niveaux INFO, WARNING, ERROR, CRITICAL."""
     return filter(lambda r: r.get("level") in VALID_LEVELS, records)
+
+
 def route(record: Record) -> tuple[str, str | None]:
     """Classe un record selon la forme de son contenu (match-case)."""
     match (record.get("payload"), record.get("connection")):
@@ -108,6 +116,7 @@ def route(record: Record) -> tuple[str, str | None]:
             return ("web", method)
         case _:
             return ("unknown", None)
+
 
 def transform(records: Iterable[Record | None]) -> Iterator[Record]:
     """Pipeline : filter(None), map(normalize), filter des niveaux."""

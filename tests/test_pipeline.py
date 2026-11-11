@@ -30,6 +30,7 @@ def test_is_valid_ip():
     assert not is_valid_ip("10.0.0")
     assert not is_valid_ip("unknown")
 
+
 def test_normalize_niveau_en_majuscules():
     result = normalize({"level": " info ", "ip": "1.2.3.4", "user": "u1"})
     assert result["level"] == "INFO"
@@ -54,9 +55,11 @@ def test_normalize_ne_modifie_pas_loriginal():
 def test_normalize_entree_inattendue():
     assert normalize(None)["level"] is None
 
+
 def test_filter_levels_retire_les_niveaux_invalides():
     sample = [{"level": "INFO"}, {"level": "DEBUGG"}, {"level": None}]
     assert list(filter_levels(sample)) == [{"level": "INFO"}]
+
 
 def test_route_texte_brut():
     record = {"payload": "cron: backup_4 completed", "connection": None}
@@ -92,6 +95,7 @@ def test_route_web_sans_connexion():
 def test_route_inconnu():
     assert route({}) == ("unknown", None)
 
+
 def test_transform_enchaine_les_etapes():
     raw = [
         {"level": " warning ", "ip": "1.1.1.1", "user": "u1"},
@@ -107,6 +111,7 @@ def test_transform_reste_paresseux():
     flux = (r for r in [{"level": "INFO", "ip": "1.1.1.1", "user": None}])
     result = transform(flux)
     assert iter(result) is result
+
 
 def test_normalize_utilisateur_en_minuscule():
     for user in ("BOB46", "Bob46", '"bob46"', "  bob46 "):
@@ -129,6 +134,7 @@ def test_normalize_reconstruit_connection():
         "connection": ("010.000.000.005", 22, "SSH"),
     }
     assert normalize(record)["connection"] == ("10.0.0.5", 22, "SSH")
+
 
 def test_normalize_payload_json():
     record = {
