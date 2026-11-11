@@ -23,6 +23,7 @@ from moteur_traitement.rules import (
     rule_sensitive_account,
 )
 from moteur_traitement.audit import audit_scope
+from collections import defaultdict
 
 
 def parse_args() -> argparse.Namespace:
@@ -44,6 +45,11 @@ def parse_args() -> argparse.Namespace:
         default=5,
         help="nombre d'échecs de connexion d'affilée avant une alerte",
     )
+    parser.add_argument(
+        "--graphiques",
+        action="store_true",
+        help="crée les graphiques du rapport dans le dossier rapport/",
+    )
     return parser.parse_args()
 
 
@@ -53,6 +59,9 @@ def setup_logging() -> None:
         level=logging.DEBUG,
         format="[%(levelname)s] %(message)s",
     )
+    # matplotlib et PIL écrivent beaucoup de messages : on les cache.
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+    logging.getLogger("PIL").setLevel(logging.WARNING)
 
 
 def show_progress(done: int, total: int, nb_lines: int, start: float) -> None:
@@ -147,6 +156,29 @@ def print_alerts(summary: AlertSummary, scan_rule: PortScanRule) -> None:
     print(f"  IP sanctionnées (scan)  : {len(scan_rule.bans()):>10,}")
 
 
+def count_attacks_by_ip(alerts: list) -> dict[str, int]:
+    """Compte les attaques de force brute par IP source."""
+    counts = defaultdict(int)
+    for ip, _user in alerts:
+        counts[ip] += 1
+    return counts
+
+
+def make_charts(analyse: Stats) -> None:
+    """Crée les 3 graphiques du rapport avec les vrais chiffres."""
+    # Import ici : matplotlib n'est chargé que si on demande les graphiques.
+    from scripts.make_charts import (
+        plot_attacks,
+        plot_levels,
+        plot_top_error_ips,
+    )
+
+    plot_levels(analyse.by_level)
+    plot_top_error_ips(analyse.errors_by_ip)
+    plot_attacks(count_attacks_by_ip(analyse.alerts))
+    print("\nGraphiques enregistrés dans le dossier rapport/")
+
+
 def main() -> None:
     """Lance le programme."""
     setup_logging()
@@ -187,6 +219,8 @@ def main() -> None:
     alerts["bans"] = scan_rule.bans()
     audit_scope(globals(), locals(), alerts, "audit_report.json")
     print("\nRapport d'audit : audit_report.json")
+    if args.graphiques:
+        make_charts(analyse)
 
 
 if __name__ == "__main__":
