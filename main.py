@@ -10,9 +10,18 @@ from moteur_traitement.ingestion import (
     parse_line,
     read_many_files,
 )
-
 from moteur_traitement.pipeline import is_valid_ip, normalize
 from moteur_traitement.analysis import Stats
+from moteur_traitement.rules import (
+    AlertSummary,
+    PortScanRule,
+    RuleChecker,
+    apply_security_rules,
+    rule_blacklisted_ip,
+    rule_critical_level,
+    rule_injection,
+    rule_sensitive_account,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -60,7 +69,12 @@ def show_progress(done: int, total: int, nb_lines: int, start: float) -> None:
     )
 
 
-def read_and_count(path: str, analyse: Stats) -> dict[str, int]:
+def read_and_count(
+    path: str,
+    analyse: Stats,
+    check: RuleChecker,
+    summary: AlertSummary,
+) -> dict[str, int]:
     """Lit le fichier ligne par ligne, nettoie et analyse les records."""
     total = os.path.getsize(path)
     stats = {"lues": 0, "rejetees": 0, "ip_invalides": 0, "gardees": 0}
@@ -82,7 +96,8 @@ def read_and_count(path: str, analyse: Stats) -> dict[str, int]:
             stats["gardees"] += 1
             # Module 3 : ajoute le record à toutes les analyses.
             analyse.update(record)
-
+            # Module 4 : applique les règles de sécurité.
+            summary.update(check(record))
         if stats["lues"] % 50_000 == 0:
             show_progress(done, total, stats["lues"], start)
 
@@ -139,9 +154,21 @@ def main() -> None:
     logging.debug("Blacklist chargée : %d IP", len(blacklist))
 
     analyse = Stats(args.max_echecs)
+    scan_rule = PortScanRule()
+    check = apply_security_rules(
+        rule_blacklisted_ip,
+        rule_injection,
+        rule_sensitive_account,
+        rule_critical_level,
+        scan_rule,
+        blacklist=blacklist,
+    )
+    summary = AlertSummary()
+
     print(f"Analyse de {args.input}...")
-    stats = read_and_count(args.input, analyse)
+    stats = read_and_count(args.input, analyse, check, summary)
     analyse.log_summary()
+    summary.log_summary()
     print_summary(stats)
     print_analysis(analyse, blacklist)
 
