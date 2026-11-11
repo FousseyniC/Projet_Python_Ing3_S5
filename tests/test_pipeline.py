@@ -129,3 +129,26 @@ def test_normalize_reconstruit_connection():
         "connection": ("010.000.000.005", 22, "SSH"),
     }
     assert normalize(record)["connection"] == ("10.0.0.5", 22, "SSH")
+
+def test_normalize_payload_json():
+    record = {
+        "level": "WARNING",
+        "ip": "1.2.3.4",
+        "user": "u1",
+        "payload": {"Action": "login", "Status": "FAILED", "Port": "22"},
+    }
+    assert normalize(record)["payload"] == {
+        "action": "login",
+        "status": "failed",
+        "port": 22,
+    }
+
+
+def test_normalize_payload_texte():
+    for text in ("cron:   backup_4   completed   ",
+                 "CRON: BACKUP_4 COMPLETED",
+                 "cron:\tbackup_4 completed\x07",
+                 '"cron: backup_4 completed"'):
+        record = {"level": "INFO", "ip": "1.2.3.4", "user": None,
+                  "payload": text}
+        assert normalize(record)["payload"] == "cron: backup_4 completed"

@@ -13,6 +13,8 @@ from moteur_traitement.constants import (
 logger = logging.getLogger(__name__)
 
 Record = dict[str, Any]
+# Clés dont la valeur est remise en minuscule ("FAILED" -> "failed").
+LOWER_VALUES = ("action", "status", "url")
 def is_valid_ip(ip: str) -> bool:
     """Vérifie qu'une IP a 4 nombres entre 0 et 255."""
     parts = ip.split(".")
@@ -35,6 +37,29 @@ def _clean(value: Any) -> Any:
         if value.lower() in NULL_USERS:
             return None
     return value
+def _clean_text(text: str) -> str:
+    """Nettoie un payload texte : guillemets, espaces, caractères parasites."""
+    # Tabulation et caractères de contrôle (\x07) deviennent des espaces.
+    text = "".join(c if c.isprintable() else " " for c in text)
+    text = " ".join(text.split()).strip('"')
+    return text.lower() if text.isupper() else text
+
+
+def _clean_payload(payload: Any) -> Any:
+    """Clés en minuscule, nombres en int, certaines valeurs en minuscule."""
+    if isinstance(payload, str):
+        return _clean_text(payload)
+    if not isinstance(payload, dict):
+        return payload
+    cleaned = {}
+    for key, value in payload.items():
+        key = str(key).lower()
+        if isinstance(value, str) and value.isdigit():
+            value = int(value)
+        elif isinstance(value, str) and key in LOWER_VALUES:
+            value = value.lower()
+        cleaned[key] = value
+    return cleaned
 
 
 def normalize(record: Record) -> Record:
@@ -56,7 +81,8 @@ def normalize(record: Record) -> Record:
             # 010.000.000.005 -> 10.0.0.5
             ip = ".".join(str(int(part)) for part in ip.split("."))
         cleaned["ip"] = ip
-
+        
+        cleaned["payload"] = _clean_payload(record.get("payload"))
         connection = record.get("connection")
         if connection is not None:
             # Même port et protocole, mais avec l'IP nettoyée.
