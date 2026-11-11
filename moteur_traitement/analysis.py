@@ -8,8 +8,12 @@
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
+
+# Un échec plus vieux que 5 minutes ne fait plus partie d'une attaque.
+WINDOW = timedelta(minutes=5)
 
 
 def error_ips(records: Iterable[dict]) -> set[str]:
@@ -56,11 +60,15 @@ class Stats:
         self.by_level = defaultdict(int)
         self.by_user = defaultdict(int)
         self.failures = defaultdict(int)
+        self.last_seen = {}
         self.alerts = []
 
     def update(self, record: dict) -> None:
         """Ajoute un record à toutes les analyses."""
         self.total += 1
+        # Tous les 100 000 records, on oublie les vieux échecs.
+        if self.total % 100_000 == 0:
+            self.forget_old(record["timestamp"])
         self.ips.add(record["ip"])
         self.by_level[record["level"]] += 1
         self.by_user[record["user"]] += 1
@@ -78,13 +86,29 @@ class Stats:
 
         key = (record["ip"], record["user"])
         if payload.get("status") == "failed":
+            # Dernier échec trop ancien : c'est une nouvelle série.
+            last = self.last_seen.get(key)
+            if last is not None and record["timestamp"] - last > WINDOW:
+                self.failures[key] = 0
             self.failures[key] += 1
+            self.last_seen[key] = record["timestamp"]
             # == et pas >= : une seule alerte par attaque.
             if self.failures[key] == self.threshold:
                 self.alerts.append(key)
         else:
             # Connexion réussie : on remet le compteur à zéro.
             self.failures.pop(key, None)
+            self.last_seen.pop(key, None)
+
+    def forget_old(self, now: datetime) -> None:
+        """Oublie les échecs de connexion de plus de 5 minutes."""
+        old_keys = []
+        for key, when in self.last_seen.items():
+            if now - when > WINDOW:
+                old_keys.append(key)
+        for key in old_keys:
+            del self.failures[key]
+            del self.last_seen[key]
 
     def compare_with_blacklist(
         self, blacklist: frozenset[str]

@@ -1,11 +1,14 @@
 """Tests du Module 3."""
 
+from datetime import datetime, timedelta
+
 from moteur_traitement import analysis
 
 
 def login(status: str, ip: str = "6.6.6.6") -> dict:
     """Fabrique un record de connexion pour les tests."""
     return {
+        "timestamp": datetime(2026, 1, 1),
         "ip": ip,
         "user": "bob",
         "level": "WARNING",
@@ -93,3 +96,29 @@ def test_stats_compare_with_blacklist(sample_records):
     blacklist = frozenset({"77.185.106.206", "8.8.8.8"})
     result = stats.compare_with_blacklist(blacklist)
     assert result["intersection"] == {"77.185.106.206"}
+
+
+def test_forget_old_oublie_les_vieux_echecs():
+    stats = analysis.Stats()
+    for _ in range(3):
+        stats.update(login("failed"))
+    assert len(stats.failures) == 1
+    stats.forget_old(datetime(2026, 1, 1) + timedelta(minutes=10))
+    assert len(stats.failures) == 0
+
+
+def test_forget_old_garde_les_echecs_recents():
+    stats = analysis.Stats()
+    for _ in range(3):
+        stats.update(login("failed"))
+    stats.forget_old(datetime(2026, 1, 1) + timedelta(minutes=1))
+    assert len(stats.failures) == 1
+
+
+def test_vieil_echec_ne_compte_plus():
+    # 4 échecs à minuit, puis 4 échecs une heure plus tard.
+    old = login("failed")
+    new = login("failed")
+    new["timestamp"] = datetime(2026, 1, 1, 1, 0)
+    records = [old] * 4 + [new] * 4
+    assert analysis.detect_brute_force(records) == []
