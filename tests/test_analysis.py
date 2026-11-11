@@ -72,6 +72,7 @@ def test_stats_update(sample_records):
         stats.update(record)
     assert stats.total == 4
     assert stats.error_ips == {"22.128.79.209", "77.185.106.206"}
+    assert stats.errors_by_ip == {"22.128.79.209": 1, "77.185.106.206": 1}
     assert stats.by_level == {
         "INFO": 1,
         "WARNING": 1,

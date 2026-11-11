@@ -57,6 +57,7 @@ class Stats:
         self.total = 0
         self.ips = set()
         self.error_ips = set()
+        self.errors_by_ip = defaultdict(int)
         self.by_level = defaultdict(int)
         self.by_user = defaultdict(int)
         self.failures = defaultdict(int)
@@ -74,6 +75,7 @@ class Stats:
         self.by_user[record["user"]] += 1
         if record["level"] in ("ERROR", "CRITICAL"):
             self.error_ips.add(record["ip"])
+            self.errors_by_ip[record["ip"]] += 1
         self.check_login(record)
 
     def check_login(self, record: dict) -> None:
