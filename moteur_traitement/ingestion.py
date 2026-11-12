@@ -148,7 +148,7 @@ def _parse_user(text: str) -> str | None:
 
 
 def _parse_payload(text: str) -> dict | str:
-    """Renvoie un dict si le payload est du JSON ou un dict Python.
+    """Renvoie un dict si le payload est du JSON (ou un dict Python).
 
     Sinon, renvoie le texte tel quel.
     """
@@ -160,16 +160,21 @@ def _parse_payload(text: str) -> dict | str:
         # Un dict écrit à la Python ({'port': 22}) n'est pas du JSON.
         try:
             value = ast.literal_eval(text)
-        except (ValueError, TypeError, SyntaxError,
-                MemoryError, RecursionError):
+        except (
+            ValueError,
+            TypeError,
+            SyntaxError,
+            MemoryError,
+            RecursionError,
+        ):
             return text
     return value if isinstance(value, dict) else text
 
 
 def _extract_connection(
-    ip: str, payload: dict | str,
+    ip: str, payload: dict | str
 ) -> tuple[str, int, str] | None:
-    """Renvoie (ip, port, PROTOCOLE), ou None si le payload est incomplet."""
+    """Construit (ip, port, PROTOCOLE) si le payload a port et protocole."""
     if not isinstance(payload, dict):
         return None
     # Les clés peuvent être en majuscule (« Port », « Protocol »).
